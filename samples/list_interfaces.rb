@@ -3,5 +3,5 @@
 require 'nfnetlink'
 
 Netfilter::Netlink.interfaces.each do |iface|
-    puts "%12s: %s" % [ iface[:name], iface[:flags].join(", ") ]
+    puts "[%d] %12s: %s" % [ iface[:index], iface[:name], iface[:flags].join(", ") ]
 end

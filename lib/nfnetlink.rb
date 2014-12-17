@@ -108,13 +108,11 @@ module Netfilter
         def each
             update_table
 
-            index = 1
-            loop do
+            for index in 1..65535
                 iface = get_iface(index)
-                break if iface.nil?
+                next if iface.nil?
 
                 yield(iface)
-                index += 1
             end
         end
 
@@ -150,7 +148,8 @@ module Netfilter
                 flags = ifflags.read_bytes(ifflags.total).unpack("I")[0]
                 flags_set = IFFLAGS.select { |bit, name| flags & bit != 0 }.values
 
-                { :name => name, 
+                { :index => index,
+                  :name => name,
                   :flags => flags_set }
             end
         end
