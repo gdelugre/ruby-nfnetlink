@@ -27,6 +27,7 @@
 
 require 'rubygems'
 require 'ffi'
+require 'thread'
 
 module Netfilter
 
@@ -86,6 +87,7 @@ module Netfilter
         }
 
         def initialize
+            @lock = Mutex.new
             @nlif_handle = Netlink.nlif_open
             raise NetlinkError, "nlif_open has failed" if @nlif_handle.null?
 
@@ -99,21 +101,25 @@ module Netfilter
         # Returns nil if interface does not exist.
         #
         def [](index)
-            update_table
-            get_iface(index)
+            @lock.synchronize {
+                update_table
+                get_iface(index)
+            }
         end
 
         #
         # Enumerator for the list of interfaces.
         #
         def each
-            update_table
-            for index in 1..65535
-                iface = get_iface(index)
-                next if iface.nil?
+            @lock.synchronize {
+                update_table
+                for index in 1..65535
+                    iface = get_iface(index)
+                    next if iface.nil?
 
-                yield(iface)
-            end
+                    yield(iface)
+                end
+            }
         end
 
         private
@@ -126,6 +132,8 @@ module Netfilter
             raise NetlinkError, "nlif_fd has failed" if nlif_fd < 0
 
             nlif_io = IO.new(nlif_fd)
+            nlif_io.autoclose = false
+
             rs, _ws, _es = IO.select([nlif_io], [], [], 0)    
 
             if rs and rs.length > 0 and rs[0] == nlif_io
@@ -133,6 +141,8 @@ module Netfilter
                     raise NetlinkError, "nlif_catch has failed"
                 end
             end
+
+            nlif_io.close
         end
 
         #
