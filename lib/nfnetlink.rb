@@ -89,6 +89,7 @@ module Netfilter
             @nlif_handle = Netlink.nlif_open
             raise NetlinkError, "nlif_open has failed" if @nlif_handle.null?
 
+            query_table
             ObjectSpace.define_finalizer(self, proc { Netlink.nlif_close(@nlif_handle) })
         end
 
@@ -98,7 +99,7 @@ module Netfilter
         # Returns nil if interface does not exist.
         #
         def [](index)
-            update_table 
+            update_table
             get_iface(index)
         end
 
@@ -107,7 +108,6 @@ module Netfilter
         #
         def each
             update_table
-
             for index in 1..65535
                 iface = get_iface(index)
                 next if iface.nil?
@@ -119,9 +119,26 @@ module Netfilter
         private
 
         #
-        # Update the internal list of interfaces.
+        # Process netlink events and updates list of interfaces.
         #
         def update_table
+            nlif_fd = Netlink.nlif_fd(@nlif_handle)
+            raise NetlinkError, "nlif_fd has failed" if nlif_fd < 0
+
+            nlif_io = IO.new(nlif_fd)
+            rs, _ws, _es = IO.select([nlif_io], [], [], 0)    
+
+            if rs and rs.length > 0 and rs[0] == nlif_io
+                if Netlink.nlif_catch(@nlif_handle) < 0
+                    raise NetlinkError, "nlif_catch has failed"
+                end
+            end
+        end
+
+        #
+        # Gets the internal list of interfaces.
+        #
+        def query_table 
             if Netlink.nlif_query(@nlif_handle) < 0
                 raise NetlinkError, "nlif_query has failed"
             end
